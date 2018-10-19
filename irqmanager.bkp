@@ -1,0 +1,73 @@
+import time
+from pcb_table import *
+from kernell import *
+from programas import *
+from disco import *
+from queue import *
+from mem import *
+from dispacher import *
+
+class InterruptionManager:
+
+	def set_dispach(self, puntero):
+		self.dispach = puntero
+
+
+	def set_PcbTable(self, pcbTable):
+		self.pcbtable = pcbTable
+
+	def set_Memory(self, memory):
+		self.memory = memory
+
+	def set_queue_ready(self, queue):
+		self.queue_ready = queue
+
+	def set_queue_waiting(self, queue):
+		self.queue_waiting = queue
+
+	def set_schedule(self, tarea):
+		self.tarea = tarea
+
+	def new(self, inst):
+		self.inst = inst
+#		self.var_mem = PCB(inc_pid(), "New",  time.strftime("%d%m%y"), 9, 5, 0, inc_mem(len(self.inst)), self.inst)
+		self.var_mem = PCB(inc_pid(), "New",  time.strftime("%d%m%y"), len(self.inst), 15, 0, inc_mem(len(self.inst)), self.inst)
+		self.var_mem.set_state("Ready")
+		self.queue_ready.put_ready(self.var_mem)
+		self.pcbtable.put(inc_id(), self.var_mem)
+		self.memory.memory_table(self.var_mem.get_basedir(), self.var_mem.get_inst())
+		self.tarea.put_cpu()
+
+	def timeout(self):
+		self.pcb = self.dispach.take_cpu()
+#		print self.pcb.get_pid()
+		self.queue_ready.agregarFinal(self.pcb)
+		self.pcbtable.eliminar_key(self.pcb.get_pid())
+		self.pcbtable.put(self.pcb.get_pid(), self.pcb)
+		self.dispach.sacar_cpu()
+		#Agregado para Schedule Priority
+		self.tarea.set_queue_ready(self.queue_ready)
+		#Fin de lo agregado para Schedule Priority
+		self.tarea.put_cpu()
+
+
+	def io(self):
+		self.pcb = self.dispach.take_cpu()
+		self.pcb.set_state("I/O")
+		self.queue_waiting.agregarFinal(self.pcb)
+		self.pcbtable.eliminar_key(self.pcb.get_pid())
+		self.pcbtable.put(self.pcb.get_pid(), self.pcb)
+		self.dispach.sacar_cpu()
+		self.tarea.put_cpu()
+
+	def io_end(self):
+		self.tarea.waiting_to_ready()		
+
+	def kill(self):
+		self.pcb = self.dispach.take_cpu()
+		self.pcb.set_state("Terminado")
+		self.pcbtable.eliminar_key(self.pcb.get_pid())
+		self.pcbtable.put(self.pcb.get_pid(), self.pcb)
+		self.dispach.sacar_cpu()
+		self.tarea.put_cpu()
+
